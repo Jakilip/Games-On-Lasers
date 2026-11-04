@@ -1,10 +1,12 @@
-#include "LsCollisions.h"
+#include "Collisions.h"
 
-#include "LsCore.h"
+#include "Core.h"
 
 #include <cmath>
 
-bool linesCollide(LsLine a, LsLine b) {
+namespace GOL {
+
+bool linesCollide(Line a, Line b) {
 
     auto orient = [](const auto& p, const auto& q, const auto& r) {
         return (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
@@ -19,7 +21,7 @@ bool linesCollide(LsLine a, LsLine b) {
         return (o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0);
     };
 
-    auto isZero = [](float v) { return std::abs(v) < LsEpsilon; };
+    auto isZero = [](float v) { return std::abs(v) < Epsilon; };
 
     float o1 = orient(a.start, a.end, b.start);
     float o2 = orient(a.start, a.end, b.end);
@@ -33,4 +35,6 @@ bool linesCollide(LsLine a, LsLine b) {
            (isZero(o2) && onSegment(a.start, a.end, b.end))   ||
            (isZero(o3) && onSegment(b.start, b.end, a.start)) ||
            (isZero(o4) && onSegment(b.start, b.end, a.end));
+}
+
 }

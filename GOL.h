@@ -2,14 +2,14 @@
 
 #include "DACs/HeliosDAC/HeliosDAC.h"
 
-#include "LsInput/LsController.h"
+#include "Input/Controller.h"
 
-#include "LsUtilities/LsCore.h"
-#include "LsUtilities/LsMath.h"
-#include "LsUtilities/LsTimer.h"
-#include "LsUtilities/LsCollisions.h"
-#include "LsUtilities/LsRandom.h"
+#include "Utilities/Core.h"
+#include "Utilities/Math.h"
+#include "Utilities/Timer.h"
+#include "Utilities/Collisions.h"
+#include "Utilities/Random.h"
 
-#include "LsRendering/LsGraphic.h"
-#include "LsRendering/LsObject.h"
-#include "LsRendering/LsProjector.h"
+#include "Rendering/Graphic.h"
+#include "Rendering/Object.h"
+#include "Rendering/Projector.h"
