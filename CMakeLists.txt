@@ -20,6 +20,15 @@ else()
     list(APPEND GOL_SOURCES DACs/HeliosDAC/idn/plt-posix.cpp)
 endif()
 
+# plt-windows / plt-posix are mutually exclusive platform backends
+list(FILTER GOL_SOURCES EXCLUDE REGEX "plt-(windows|posix)\\.cpp$")
+
+if(WIN32)
+    list(APPEND GOL_SOURCES DACs/HeliosDAC/idn/plt-windows.cpp)
+else()
+    list(APPEND GOL_SOURCES DACs/HeliosDAC/idn/plt-posix.cpp)
+endif()
+
 add_library(GOL STATIC ${GOL_SOURCES}
         Utilities/Collisions.cpp
         Utilities/Collisions.h
