@@ -75,8 +75,9 @@ struct Line {
 
 constexpr float Epsilon = 0.001f;
 constexpr float PI = 3.14159265359f;
-constexpr float CanvasSize = 65535.f;
-constexpr float CanvasCenter = CanvasSize/2.f;
+constexpr float CanvasSize = 1000.f;
+constexpr float CanvasHalf = CanvasSize / 2.f;
+constexpr Vec2F CanvasCenter = {CanvasSize/2.f, CanvasSize/2.f};
 
 constexpr Color Blank = {0, 0, 0, 0};
 constexpr Color White = {255, 255, 255};

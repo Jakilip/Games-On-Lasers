@@ -75,4 +75,10 @@ void Graphic::logContents() const {
     }
 }
 
+Graphic::Graphic(const std::vector<Line>& lines) {
+    for (auto& l : lines) {
+        this->addLine(l, 0);
+    }
 }
+
+};

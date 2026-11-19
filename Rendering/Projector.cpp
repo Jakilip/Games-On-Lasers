@@ -15,13 +15,13 @@ void Projector::setFramerate(unsigned framerate) { this->framerate = framerate; 
 void Projector::setScanrate(unsigned scanrate) { this->scanrate = scanrate; }
 
 bool Projector::setDevice(unsigned deviceID) {
-    dac.CloseDevices();
-    dac.OpenDevices();
+    heliosDac.CloseDevices();
+    heliosDac.OpenDevices();
 
     if(validDevicesAmount >= deviceID+1) {
         this->deviceID = deviceID;
         this->currentDeviceDAC = HELIOS;
-        if(dac.GetSupportsHigherResolutions(this->deviceID))
+        if(heliosDac.GetSupportsHigherResolutions(this->deviceID))
             this->currentDeviceDAC = HELIOS_HQ;
     }
     else
@@ -55,17 +55,17 @@ void Projector::pushFrame() {
 
 
 Projector::Projector() {
-    dac.CloseDevices();
-    validDevicesAmount = dac.OpenDevices();
+    heliosDac.CloseDevices();
+    validDevicesAmount = heliosDac.OpenDevices();
 }
 
 Projector::~Projector() {
-    dac.CloseDevices();
+    heliosDac.CloseDevices();
     std::cout << "Cleaning up helios\n";
 }
 
 void Projector::closeDAC() {
-    dac.CloseDevices();
+    heliosDac.CloseDevices();
     std::cout << "Cleaning up helios\n";
 }
 

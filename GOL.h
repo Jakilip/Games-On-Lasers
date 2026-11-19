@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DACs/HeliosDAC/HeliosDAC.h"
+#include "DACs/HeliosDAC/HeliosDac.h"
 
 #include "Input/Controller.h"
 

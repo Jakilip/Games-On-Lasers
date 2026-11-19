@@ -29,11 +29,7 @@ else()
     list(APPEND GOL_SOURCES DACs/HeliosDAC/idn/plt-posix.cpp)
 endif()
 
-add_library(GOL STATIC ${GOL_SOURCES}
-        Utilities/Collisions.cpp
-        Utilities/Collisions.h
-        Utilities/Random.cpp
-        Utilities/Random.h)
+add_library(GOL STATIC ${GOL_SOURCES})
 target_include_directories(GOL PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(GOL
         PUBLIC usb-1.0 ws2_32 winmm iphlpapi

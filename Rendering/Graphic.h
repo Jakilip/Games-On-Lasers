@@ -62,6 +62,9 @@ public:
     /// Logs lines and colors in this graphic
     void logContents() const;
 
+    /// Constructs a graphic with copy of passed lines, and one default color channel (index 0, value white)
+    Graphic(const std::vector<Line>& lines);
+
     Graphic() = default;
 };
 

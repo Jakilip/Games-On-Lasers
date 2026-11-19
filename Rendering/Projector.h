@@ -24,7 +24,7 @@ private:
         HELIOS_HQ,
         NO_CONNECTION
     };
-    HeliosDac dac;
+    HeliosDac heliosDac;
     int validDevicesAmount = 0;
     DAC currentDeviceDAC = NO_CONNECTION;
 
