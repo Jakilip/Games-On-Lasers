@@ -5,8 +5,6 @@
     Games On Lasers - GOL
 </h1>
 
----
-
 A C++ library for easily writing interactive laser control software - designed for game development.
 
 <h1 align="center">
