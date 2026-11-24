@@ -91,7 +91,7 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
             colors.emplace_back(graphic.getColor(graphic.getColorChannel(i)));
         }
     }
-    if(lines.empty()) return {{CanvasCenter, CanvasCenter, Blank}};
+    if(lines.empty()) return {{CanvasCenter, Blank}};
 
     //place blank line in between laser pos and first point
     lines.insert(lines.begin(), {galvoState.currentPos, lines[0].start});

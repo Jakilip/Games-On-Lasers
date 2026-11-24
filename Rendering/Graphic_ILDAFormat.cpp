@@ -34,18 +34,29 @@ struct IldaPoint {
     uint8_t colorIndex = 0; // only used when writing indexed formats
 };
 
-// Loading shifts the picture so its bottom left corner (smallest x and smallest y) sits at 0, 0 in graphic space.
-// Saving centers the picture on the middle of the ILDA coordinate space. ILDA coordinates are signed 16 bit,
-// so a picture larger than 65535 in either direction is clamped at the edges.
+// ILDA coordinates are signed 16 bit, so the ILDA coordinate space spans -32768 to 32767 (65535 units) in both
+// directions. That whole space corresponds to a square canvas of CanvasSize x CanvasSize, so one ILDA unit is
+// CanvasSize / 65535 graphic units.
+// Loading shifts the picture so its bottom left corner (smallest x and smallest y) sits at 0, 0 in graphic space,
+// then scales it to canvas units.
+// Saving scales back to ILDA units and centers the picture on the middle of the ILDA coordinate space. A picture
+// larger than the whole space in either direction is clamped at the edges.
 // These two functions are the only place that needs to change if the coordinate mapping (or y direction) does.
 
+constexpr float IldaMin = -32768.f;
+constexpr float IldaMax = 32767.f;
+constexpr float IldaSpan = IldaMax - IldaMin;
+
 Vec2F toGraphic(int16_t x, int16_t y, const Vec2F& origin) {
-    return {static_cast<float>(x) - origin.x, static_cast<float>(y) - origin.y};
+    return {(static_cast<float>(x) - origin.x) / IldaSpan * CanvasSize,
+            (static_cast<float>(y) - origin.y) / IldaSpan * CanvasSize};
 }
 
+/// Takes a graphic space offset (already relative to the picture center) and returns ILDA units
 int16_t toIlda(float v) {
     assert(std::isfinite(v));
-    v = std::clamp(v, -32768.f, 32767.f);
+    v = v / CanvasSize * IldaSpan;
+    v = std::clamp(v, IldaMin, IldaMax);
     return static_cast<int16_t>(std::lround(v));
 }
 
@@ -113,6 +124,20 @@ struct IldaSegment {
     Color color;
 };
 
+/// True if a lit run that currently ends at the end of `segment` can continue to `to` as the same line: same color,
+/// on the same straight line and heading the same way (a point that doubles back is a corner, not a continuation).
+/// Done in integer ILDA space, so the collinearity test is exact.
+bool extendsSegment(const IldaSegment& segment, const IldaPoint& to) {
+    const int64_t dx1 = segment.x1 - segment.x0, dy1 = segment.y1 - segment.y0;
+    const int64_t dx2 = to.x - segment.x1, dy2 = to.y - segment.y1;
+
+    const bool collinear = dx1 * dy2 - dy1 * dx2 == 0;
+    const bool sameDirection = dx1 * dx2 + dy1 * dy2 > 0;
+    const bool sameColor = segment.color.r == to.color.r && segment.color.g == to.color.g &&
+                           segment.color.b == to.color.b && segment.color.a == to.color.a;
+    return collinear && sameDirection && sameColor;
+}
+
 /// ILDA points are samples sent straight to the scanners, and the blanking bit decides whether the laser is on
 /// while the beam travels to that point. So a line is drawn from the previous point (lit or blanked) to every
 /// lit point, colored by the point it arrives at. Segments of zero length are skipped, and a lit point that
@@ -137,6 +162,13 @@ Graphic buildGraphic(const std::vector<IldaPoint>& points, bool colorsDefined) {
             const IldaPoint& from = points[k - 1];
             const IldaPoint& to = points[k];
             if (from.x == to.x && from.y == to.y) continue;
+
+            // A point that continues the previous segment along the same straight line only moves its end point
+            if (segments.size() > segmentsBefore && extendsSegment(segments.back(), to)) {
+                segments.back().x1 = to.x;
+                segments.back().y1 = to.y;
+                continue;
+            }
             segments.push_back({from.x, from.y, to.x, to.y, to.color});
         }
 
@@ -156,7 +188,7 @@ Graphic buildGraphic(const std::vector<IldaPoint>& points, bool colorsDefined) {
                                 Vec2F{static_cast<float>(segment.x1), static_cast<float>(segment.y1)}}) {
             origin = first ? p : Vec2F{std::min(origin.x, p.x), std::min(origin.y, p.y)};
             first = false;
-                                }
+        }
     }
 
     Graphic graphic;
@@ -307,7 +339,7 @@ bool Graphic::saveToFile(const std::string& filePath, unsigned ildaFormat) const
             anyVisible = true;
         }
     }
-    // Rounded to a whole unit so every point shifts by the same integer amount and the picture keeps its exact size
+    // Rounded to a whole unit so every point shifts by the same amount and the picture keeps its exact size
     const Vec2F center = {std::round((minCorner.x + maxCorner.x) / 2.f), std::round((minCorner.y + maxCorner.y) / 2.f)};
 
     // Every stroke starts with a blanked point and a lit point at the same position, which is how
