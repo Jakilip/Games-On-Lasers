@@ -9,25 +9,25 @@ namespace GOL {
 
 //save and load are implemented in ILDAFormat.cpp
 
-Vec2F Object::getPosition() { return position; }
+Vec2F Object::getPosition() const { return position; }
 
-float Object::getRotation() { return rotation; }
+float Object::getRotation() const { return rotation; }
 
-Vec2F Object::getScale() { return scale; }
+Vec2F Object::getScale() const { return scale; }
 
-Vec2F Object::getOrigin() { return originPointNormalized; }
+Vec2F Object::getOrigin() const { return originPointNormalized; }
 
-Graphic Object::getTransformedGraphic() { applyTransformation(); return transformGraphic; }
+Graphic Object::getTransformedGraphic() const { return transformGraphic; }
 
 Graphic& Object::getSourceGraphic() { return sourceGraphic; }
 
-void Object::setPosition(Vec2F newPosition) { this->position = newPosition; }
+void Object::setPosition(Vec2F newPosition) { this->position = newPosition; applyTransformation(); }
 
-void Object::setScale(Vec2F newScale) { this->scale = newScale; }
+void Object::setScale(Vec2F newScale) { this->scale = newScale; applyTransformation(); }
 
-void Object::setRotation(float newRotation) { this->rotation = newRotation; }
+void Object::setRotation(float newRotation) { this->rotation = newRotation; applyTransformation(); }
 
-void Object::setOrigin(Vec2F newOrigin) { this->originPointNormalized = newOrigin; }
+void Object::setOrigin(Vec2F newOrigin) { this->originPointNormalized = newOrigin; applyTransformation(); }
 
 void Object::setSourceGraphic(const Graphic& sourceGraphic, bool resetTransform) {
     this->sourceGraphic = sourceGraphic;
@@ -37,10 +37,10 @@ void Object::setSourceGraphic(const Graphic& sourceGraphic, bool resetTransform)
         this->rotation = 0.f;
         this->originPointNormalized = {0.5f, 0.5f};
     }
+    this->applyTransformation();
 }
 
-bool Object::collidesWith(Object &other) {
-    this->applyTransformation();
+bool Object::collidesWith(const Object &other) const {
     const auto& otherLines = other.getTransformedGraphic().lines;
 
     for(auto& thisLine : this->transformGraphic.lines) {
@@ -52,8 +52,7 @@ bool Object::collidesWith(Object &other) {
     return false;
 }
 
-bool Object::collidesWith(const Line& other) {
-    this->applyTransformation();
+bool Object::collidesWith(const Line& other) const {
 
     for(auto& line : this->transformGraphic.lines) {
         if(linesCollide(other, line))

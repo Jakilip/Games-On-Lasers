@@ -45,29 +45,29 @@ public:
     void setSourceGraphic(const Graphic& sourceGraphic, bool resetTransform = false);
 
     /// @returns The Object's position.
-    Vec2F getPosition();
+    [[nodiscard]] Vec2F getPosition() const;
 
     /// @returns The Object's scale.
-    Vec2F getScale();
+    [[nodiscard]] Vec2F getScale() const;
 
     /// @returns The Object's rotation.
-    float getRotation();
+    [[nodiscard]] float getRotation() const;
 
     /// @returns The Object's origin.
-    Vec2F getOrigin();
+    [[nodiscard]] Vec2F getOrigin() const;
 
     /// @returns A copy of the resulting transformed picture of this Object.
-    Graphic getTransformedGraphic();
+    [[nodiscard]] Graphic getTransformedGraphic() const;
 
     /// Allows for direct manipulation of the source graphic via a reference. Mainly useful for changing color values in real time.
     /// @returns A reference to this Object's source graphic.
     Graphic& getSourceGraphic();
 
     /// Checks if any of the Object's transformed lines intersect with any transformed line from another Object.
-    bool collidesWith(Object& other);
+    bool collidesWith(const Object &other) const;
 
     /// Checks if any of the Object's transformed lines intersect with a line.
-    bool collidesWith(const Line& other);
+    bool collidesWith(const Line& other) const;
 
     /// Constructs an Object and sets a source Graphic right away
     Object(const Graphic& sourceGraphic);

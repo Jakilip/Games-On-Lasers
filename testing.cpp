@@ -2,72 +2,78 @@
 
 #include "GOL.h"
 
+/// OPEN WORLD WITH GOL ///
+
+void doCollisions(GOL::Vec2F moveVec, GOL::Object& player, GOL::Object& map) {
+    GOL::Vec2F mapPos = map.getPosition();
+
+    map.setPosition({mapPos.x - moveVec.x, mapPos.y});
+    //if(player.collidesWith(map))
+        //map.setPosition(mapPos);
+
+    mapPos = map.getPosition();
+
+    map.setPosition({mapPos.x, mapPos.y - moveVec.y});
+    //if(player.collidesWith(map))
+        //map.setPosition(mapPos);
+}
+
 int main() {
 
-    GOL::Graphic GOLLogo_Graphic;
-    GOL::Graphic letterG_Graphic;
-    GOL::Graphic letterO_Graphic;
-    GOL::Graphic letterL_Graphic;
-    GOL::Graphic davidStar_Graphic;
-    GOL::Graphic weirdTriangle_Graphic;
-    GOL::Graphic polishFlag_Graphic;
-    GOL::Graphic circle_Graphic = GOL::makeCircle({900.f, 900.f});
+    GOL::ControllerManager contrManager;
+    if(contrManager.getControllerCount() <= 0) {
+        std::cerr << "No controllers connected!";
+        return 1;
+    }
 
-    GOLLogo_Graphic.loadFromFile("GOLLogo.ild");
-    letterG_Graphic.loadFromFile("LetterG.ild");
-    letterO_Graphic.loadFromFile("LetterO.ild");
-    letterL_Graphic.loadFromFile("LetterL.ild");
-    davidStar_Graphic.loadFromFile("davidStar.ild");
-    weirdTriangle_Graphic.loadFromFile("weirdTriangle.ild");
-    polishFlag_Graphic.loadFromFile("polishFlag.ild");
-
-    GOL::Object GOLLogo(GOLLogo_Graphic);
-    GOLLogo.setPosition(GOL::CanvasCenter);
-    GOLLogo.setScale({0.f, 0.f});
-
-    GOL::Object letterG(letterG_Graphic);
-    GOL::Object letterO(letterO_Graphic);
-    GOL::Object letterL(letterL_Graphic);
-    letterG.setPosition({GOL::CanvasHalf - 200.f, GOL::CanvasHalf - 300.f});
-    letterO.setPosition({GOL::CanvasHalf, GOL::CanvasHalf - 300.f});
-    letterL.setPosition({GOL::CanvasHalf + 200.f, GOL::CanvasHalf - 300.f});
-
-    GOL::Object davidStar(davidStar_Graphic);
-    GOL::Object weirdTriangle(weirdTriangle_Graphic);
-    GOL::Object polishFlag(polishFlag_Graphic);
-    GOL::Object circle(circle_Graphic);
-
+    // set up connection with the laser projector
     GOL::Projector projector;
-    if (!projector.setDevice(0)) {
-        std::cout << "No devices found";
-        return -1;
+
+    if(!projector.setDevice(0)) {
+        std::cerr << "Device invalid!";
+        return 1;
     }
     projector.setFramerate(50);
-    projector.setScanrate(14000);
+    projector.setScanrate(10000);
 
-    GOL::Timer elapsedTimer;
-    GOL::Timer dtTimer;
-    float elapsed = 0.f, dt;
+    GOL::Graphic mapGraphic;
+    mapGraphic.loadFromFile("example.ild");
+    //mapGraphic.logContents();
+    //return 0;
 
-    while (elapsed < 10.f) {
+    GOL::Object map(mapGraphic);
+    map.setOrigin({0.1f, 0.1f});
+    map.setScale({1.f, 1.f}); // make the map 20k x 20k size
 
-        elapsed = elapsedTimer.getTimeAsSeconds();
-        dt = dtTimer.getTimeAsSeconds();
-        dtTimer.restart();
+    GOL::Object player(GOL::makeCircle({250.f, 250.f}, 12));
+    player.getSourceGraphic().setColor(GOL::Red, 0);
+    player.setPosition(GOL::CanvasCenter);
 
-        if (elapsed >= 1.f && elapsed <= 10.f) {
-            float scale = std::min((elapsed - 1.f) / 2.f, 1.f);
-            GOLLogo.setScale({scale, scale});
-            projector.draw(GOLLogo);
+    float playerSpeed = 1000.f; // travels at up to 1000 units per second
 
-            if (elapsed >= 4.5f)
-                projector.draw(letterG);
-            if (elapsed >= 5.25f)
-                projector.draw(letterO);
-            if (elapsed >= 6.0f)
-                projector.draw(letterL);
-        }
+    // create timer for measuring time between frames
+    GOL::Timer deltaTimer;
+
+    // game loop, pressing touchpad on controller 0 exits
+    while(!contrManager.isButtonPressed(0, GOL::ControllerButton::TOUCHPAD)) {
+        contrManager.updateInputs();
+
+        float dt = std::min(deltaTimer.getTimeAsSeconds(), 1.f/projector.getFramerate());
+        deltaTimer.restart();
+
+        GOL::Vec2F moveVec;
+        moveVec.x = playerSpeed * dt * contrManager.getAxisValue(0, GOL::ControllerAxis::LEFT_X);
+        moveVec.y = playerSpeed * dt * -contrManager.getAxisValue(0, GOL::ControllerAxis::LEFT_Y);
+
+        std::cout << moveVec << "\n";
+
+        doCollisions(moveVec, player, map);
+
+        projector.draw(map);
+        //projector.draw(player);
 
         projector.pushFrame();
     }
-};
+
+    return 0;
+}

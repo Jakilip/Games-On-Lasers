@@ -120,6 +120,16 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
     constexpr float accelRatio = 0.8f;
     constexpr float deccelRatio = 0.2f;
 
+    // easing strengths used by the accel / deccel curves below
+    constexpr float accelStrength = 2.5f;
+    constexpr float deccelStrength = 4.0f;
+
+    // Share of a line's points that goes to accel so the galvo speed matches where accel ends and deccel starts.
+    // speed (line fractions per point) at accel exit  = accelRatio  * accelStrength  / pointsForAccel
+    // speed (line fractions per point) at deccel start = deccelRatio * deccelStrength / pointsForDeccel
+    // setting them equal gives pointsForAccel / pointsForDeccel = (accelRatio * accelStrength) / (deccelRatio * deccelStrength)
+    constexpr float accelPointsShare = (accelRatio * accelStrength) / (accelRatio * accelStrength + deccelRatio * deccelStrength);
+
     unsigned pointsBudget = this->scanrate / this->framerate; // for 15000 pps 50 fps its 300
 
 
@@ -147,9 +157,13 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
     float blankAlloc = blankDistance / totalDistance;
 
     auto angleDiff = [](Line& line1, Line& line2) {
+        // zero length lines (like the final blank point) have no direction, so they don't count as a turn
+        if (distance(line1.start, line1.end) <= Epsilon || distance(line2.start, line2.end) <= Epsilon)
+            return 0.f;
+
         float diff = std::abs(angleTo(line1.start, line1.end) - angleTo(line2.start, line2.end));
         if (diff >= 180.f)
-            diff = 180.f - diff;
+            diff = 360.f - diff;
         return diff;
     };
 
@@ -157,9 +171,9 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
     for (int i = 0; i < lines.size()-1; ++i) {
         totalTurnsDegrees += angleDiff(lines[i], lines[i+1]);
     }
-    float averageTurn = totalTurnsDegrees / lines.size()-1;
+    float averageTurn = totalTurnsDegrees / static_cast<float>(lines.size()-1);
 
-    deccelAlloc += (averageTurn / 360.f * 2.f); // allocate from 0% to 200% more, proportionally to the average turn
+    deccelAlloc += (averageTurn / 180.f * 2.f); // allocate from 0% to 200% more, proportionally to the average turn
 
     accelAlloc += (this->optimizationConfig.accelerationControl);
     deccelAlloc += (this->optimizationConfig.corneringLevel);
@@ -187,7 +201,7 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
         float lineDist = distance(lines[i].start, lines[i].end);
 
         if (colors[i].a == 0) {
-            float lineRatio = lineDist / blankDistance;
+            float lineRatio = blankDistance > 0.f ? lineDist / blankDistance : 0.f;
             float pointsForThisLine = lineRatio * static_cast<float>(blankPoints);
             pointsAllocated[i] = std::floor(pointsForThisLine);
 
@@ -198,11 +212,12 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
             }
         }
         else {
-            float accelRatio = accelDistance / totalDistance;
-            float deccelRatio = deccelDistance / totalDistance;
+            // this line's share of all the lit distance (accel and deccel are both a fixed fraction of the line, so the share is the same)
+            float accelRatio = (accelDistance + deccelDistance) > 0.f ? lineDist / (accelDistance + deccelDistance) : 0.f;
+            float deccelRatio = accelRatio;
 
             float turnRatio;
-            if (i == lines.size())
+            if (i + 1 >= lines.size() || totalTurnsDegrees <= 0.f)
                 turnRatio = 0.f;
             else
                 turnRatio = angleDiff(lines[i], lines[i+1]) / totalTurnsDegrees;
@@ -219,6 +234,10 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
             }
         }
     }
+
+    // the final blank point has zero length so the distribution above gives it nothing, but it must be output to turn the laser off
+    if (pointsAllocated.back() == 0)
+        pointsAllocated.back() = 1;
 
     // build a list of points ready for output using the list of lines. Apply the optimization parameters
     // accel - first 80% of a line ; deaccel - last 20% of a line
@@ -238,32 +257,63 @@ std::vector<Projector::AmbiguousPoint> Projector::buildOptimalOutput() {
         return std::pow(t, strength);
     };
 
+    constexpr int blankDwellPoints = 3;
+
     for (int i = 0; i < lines.size(); ++i) {
         if (colors[i].a == 0) {
             Vec2F lineVec = lines[i].end - lines[i].start;
+
+            // zero length blank lines (the final blank point) are not travel, so they don't get dwell
+            bool isTravel = distance(lines[i].start, lines[i].end) > Epsilon;
+
+            // park at the start of the blank line, so the laser is off before the galvo moves
+            if (isTravel)
+                for (int d = 0; d < blankDwellPoints; ++d)
+                    points.emplace_back(lines[i].start, colors[i]);
+
             for (int p = 0; p < pointsAllocated[i]; ++p) {
                 points.emplace_back(lines[i].start + lineVec * (static_cast<float>(p) / static_cast<float>(pointsAllocated[i])), colors[i]);
             }
+
+            // park at the end of the blank line, so the galvo has arrived before the next line lights up
+            if (isTravel)
+                for (int d = 0; d < blankDwellPoints; ++d)
+                    points.emplace_back(lines[i].end, colors[i]);
         }
         else {
             // gotta refactor later to save points allocated saparate for accel and deccel. splitting 50/50 for now
-            int pointsForAccel = pointsAllocated[i] / 2;
-            int pointsForDeccel = pointsAllocated[i] / 2;
-            if (pointsAllocated[i] % 2 == 1)
-                pointsForDeccel++;
+            // (now split by accelPointsShare so galvo speed at accel exit == speed at deccel start)
+            int totalPointsForLine = static_cast<int>(pointsAllocated[i]);
+            int pointsForAccel = static_cast<int>(std::round(static_cast<float>(totalPointsForLine) * accelPointsShare));
+
+            // keep at least 1 accel point so the line start (the corner) is always hit, and at least 1 deccel point when there's room
+            if (totalPointsForLine >= 2) {
+                if (pointsForAccel < 1) pointsForAccel = 1;
+                if (pointsForAccel > totalPointsForLine - 1) pointsForAccel = totalPointsForLine - 1;
+            }
+            int pointsForDeccel = totalPointsForLine - pointsForAccel;
 
             Vec2F lineVec = lines[i].end - lines[i].start;
             for (int p = 0; p < pointsForAccel; p++) {
-                Vec2F pos = lines[i].start + lineVec * (easeIn(p, pointsForAccel, 2.5f) * accelRatio);
+                Vec2F pos = lines[i].start + lineVec * (easeIn(p, pointsForAccel, accelStrength) * accelRatio);
                 points.emplace_back(pos, colors[i]);
             }
 
             for (int p = 0; p < pointsForDeccel; p++) {
-                Vec2F pos = lines[i].start + lineVec * ((easeOut(p, pointsForDeccel, 4.0f) * (deccelRatio)) + accelRatio);
+                Vec2F pos = lines[i].start + lineVec * ((easeOut(p, pointsForDeccel, deccelStrength) * (deccelRatio)) + accelRatio);
                 points.emplace_back(pos, colors[i]);
+            }
+
+            // the deccel curve stops just short of the line end, so when a blank line follows (end of a shape),
+            // place two lit points exactly on the corner. This makes the shape's last corner complete
+            if (i + 1 < lines.size() && colors[i+1].a == 0) {
+                points.emplace_back(lines[i].end, colors[i]);
+                points.emplace_back(lines[i].end, colors[i]);
             }
         }
     }
+
+    if (points.empty()) return {{galvoState.currentPos, Blank}};
 
     galvoState.currentPos = {points.back().pos.x, points.back().pos.y};
 
